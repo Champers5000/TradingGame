@@ -36,7 +36,9 @@
     "PositionLimit": 100
   },
   "Traders": {
-    "TraderOne": "secret",
-    "TraderTwo": "secret"
+    "TraderOne": "Champ",
+    "TraderTwo": "Mine",
+    "Default": "secret",
+    "Last Night": "kinda"
   }
 }
