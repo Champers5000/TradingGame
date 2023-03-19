@@ -89,17 +89,23 @@ class AutoTrader(BaseAutoTrader):
         global global_ask_Vol
         global global_bid_Prices
         global global_bid_Vol
-
-        #kill any orders that have no shot of being filled/they have lasted for more than 5 updates
+        print("itereation ", sequence_number)
+    
+        #kill any orders that have no shot of being filled/they have lasted for more than 20 updates
+        removetheseIDs = list()
         for i in self.bids:
-            if(sequence_number - self.importantorders[i] > 20):
-                self.bids.discard(i)
-                self.importantorders.pop(i, None)
+            if(i in self.importantorders):
+                if(sequence_number - self.importantorders[i] > 20):
+                    removetheseIDs.append(i)
         for i in self.asks:
-            if(sequence_number - self.importantorders[i] > 20):
-                self.asks.discard(i)
-                self.importantorders.pop(i, None)
-
+            if(i in self.importantorders):
+                if(sequence_number - self.importantorders[i] > 20):
+                    removetheseIDs.append(i)
+        for i in removetheseIDs:
+            self.send_cancel_order(i)
+            self.bids.discard(i)
+            self.importantorders.pop(i, None)
+        print("done with for loops")
         """Called periodically to report the status of an order book.
 
         The sequence number can be used to detect missed or out-of-order
@@ -115,15 +121,18 @@ class AutoTrader(BaseAutoTrader):
         #if neither case works, put in buy and sell orders in the ETF market to decrease spread
         midprice = (ask_prices[0] + bid_prices[0])//2
         globalmidprice = (global_ask_Prices[0] + global_bid_Prices[0])//2
+
         if instrument == Instrument.ETF:
             #figure out if stock price has moved up or down since the last order book update
             goingup=True
             if(midprice< globalmidprice):
                 goingup=False
 
+            print("spread is ", ask_prices[0] - bid_prices[0])
             if(ask_prices[0] - bid_prices[0] > 2*TICK_SIZE_IN_CENTS):
                 new_bid_price = 0
                 new_ask_price = 0
+                print("spread is big enough",ask_prices[0] - bid_prices[0])
                 if(goingup):
                     #keep the same ask price, increase the bid price from best bidder by 1
                     new_bid_price = bid_prices[0]+TICK_SIZE_IN_CENTS
@@ -132,7 +141,8 @@ class AutoTrader(BaseAutoTrader):
                         self.bid_price = new_bid_price
                         print("adding bid")
                         self.send_insert_order(self.bid_id, Side.BUY, new_bid_price, LOT_SIZE, Lifespan.GOOD_FOR_DAY)
-                        self.importantorders.add({self.bid_id:sequence_number})
+                        print("sent order")
+                        self.importantorders.update({self.bid_id:sequence_number})
                         self.bids.add(self.bid_id)
                 else:
                     #keep the same bid price, decrease the ask price by 1
@@ -144,12 +154,11 @@ class AutoTrader(BaseAutoTrader):
                         self.send_insert_order(self.ask_id, Side.SELL, new_ask_price, LOT_SIZE, Lifespan.GOOD_FOR_DAY)
                         self.importantorders.update({self.ask_id:sequence_number})
                         self.asks.add(self.ask_id)
-
-
             global_ask_Prices = ask_prices
             global_ask_Vol = ask_volumes
             global_bid_Prices = bid_prices
             global_bid_Vol = bid_volumes
+            
         '''
         if instrument == Instrument.FUTURE:
             if(midprice == globalmidprice):
@@ -228,9 +237,11 @@ class AutoTrader(BaseAutoTrader):
                 self.ask_id = 0
 
             # It could be either a bid or an ask
+            print("filled order ",client_order_id)
             self.bids.discard(client_order_id)
             self.asks.discard(client_order_id)
             self.importantorders.pop(client_order_id, None)
+            print("done removing item from set and dict")
 
     def on_trade_ticks_message(self, instrument: int, sequence_number: int, ask_prices: List[int],
                                ask_volumes: List[int], bid_prices: List[int], bid_volumes: List[int]) -> None:
